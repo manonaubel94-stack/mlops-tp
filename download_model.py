@@ -1,8 +1,4 @@
-"""Télécharge la dernière version du modèle depuis le Model Registry MLflow de DagsHub.
-Exécuté pendant le `docker build`.
 
-Variables d'environnement : MLFLOW_TRACKING_USERNAME, MLFLOW_TRACKING_PASSWORD
-"""
 import os
 
 import mlflow

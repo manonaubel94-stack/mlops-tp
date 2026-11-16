@@ -1,0 +1,46 @@
+name: Build and push Docker image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # permet de relancer le build à la main (ex. après un nouvel entraînement)
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push (fetches latest model from DagsHub/MLflow)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/mlops-tp:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/mlops-tp:${{ github.sha }}
+          build-args: |
+            CACHE_BUST=${{ github.run_id }}
+          secrets: |
+            mlflow_user=${{ secrets.DAGSHUB_USERNAME }}
+            mlflow_token=${{ secrets.DAGSHUB_TOKEN }}
+
+      - name: Smoke test /predict
+        run: |
+          docker run -d --name api -p 8000:8000 ${{ secrets.DOCKERHUB_USERNAME }}/mlops-tp:${{ github.sha }}
+          for i in $(seq 1 30); do
+            curl -sf -X POST localhost:8000/predict -H 'Content-Type: application/json' \
+              -d '{"instances":[[0,0,5,13,9,1,0,0,0,0,13,15,10,15,5,0,0,3,15,2,0,11,8,0,0,4,12,0,0,8,8,0,0,5,8,0,0,9,8,0,0,4,11,0,1,12,7,0,0,2,14,5,10,12,0,0,0,0,6,13,10,0,0,0]]}' && exit 0
+            sleep 2
+          done
+          docker logs api; exit 1
